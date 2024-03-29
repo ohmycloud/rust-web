@@ -76,23 +76,6 @@ impl FromStr for QuestionId {
     }
 }
 
-/*
-fn main() {
-    let question = Question::new(
-        QuestionId::from_str("1").expect("No id provided"),
-        "第一个问题".into(),
-        "问题描述".into(),
-        Some(vec!["raku".into(), "Grammar".into()])
-    );
-    println!("{:?}", question);
-
-    assert_eq!("(1.987, 2.983)", format!("{}", Position {
-        longitude: 1.987,
-        latitude: 02.9830
-    }));
-}
-*/
-
 use warp::Filter;
 use std::collections::HashMap;
 
@@ -126,4 +109,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>>{
         .await?;
     println!("{:#?}", resp);
     Ok(())
+}
+
+#[test]
+fn it_works() {
+    let question = Question::new(
+        QuestionId::from_str("1").expect("No id provided"),
+        "第一个问题".into(),
+        "问题描述".into(),
+        Some(vec!["raku".into(), "Grammar".into()])
+    );
+    println!("{:?}", question);
+
+    assert_eq!("(1.987, 2.983)", format!("{}", Position {
+        longitude: 1.987,
+        latitude: 02.9830
+    }));
 }
