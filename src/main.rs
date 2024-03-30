@@ -50,6 +50,21 @@ use warp::{
     http::StatusCode
 };
 
+pub async fn add_question(
+    store: Store,
+    question: Question
+) -> Result<impl warp::Reply, warp::Rejection> {
+    store
+        .questions
+        .write()
+        .await
+        .insert(question.id.clone(), question);
+    Ok(warp::reply::with_status(
+        "Question added",
+        StatusCode::OK,
+    ))
+}
+
 pub async fn get_questions(
     params: HashMap<String, String>,
     store: Store
@@ -146,15 +161,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
            Method::PUT, Method::DELETE, Method::GET, Method::POST
         ]);
 
-    let get_items = warp::get()
+    let get_questions = warp::get()
         .and(warp::path("questions"))
         .and(warp::path::end())
         .and(warp::query())
-        .and(store_filter)
-        .and_then(get_questions)
-        .recover(return_error);
+        .and(store_filter.clone())
+        .and_then(get_questions);
 
-    let routes = get_items.with(cors);
+    let add_question = warp::post()
+        .and(warp::path("questions"))
+        .and(warp::path::end())
+        .and(store_filter.clone())
+        .and(warp::body::json())
+        .and_then(add_question);
+
+    let routes = get_questions
+        .or(add_question)
+        .with(cors)
+        .recover(return_error);
 
     warp::serve(routes)
         .run(([127,0,0,1], 3030))
