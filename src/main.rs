@@ -79,8 +79,12 @@ impl FromStr for QuestionId {
     }
 }
 
-use warp::Filter;
-use std::collections::HashMap;
+use warp::{Filter, reject::Reject, Rejection, Reply, http::StatusCode};
+
+#[derive(Debug)]
+struct InvalidId;
+
+impl Reject for InvalidId {}
 
 pub async fn get_questions() -> Result<impl warp::Reply, warp::Rejection> {
     let question = Question::new(
@@ -90,7 +94,28 @@ pub async fn get_questions() -> Result<impl warp::Reply, warp::Rejection> {
         Some(vec!("faq".to_string())),
     );
 
-    Ok(warp::reply::json(&question))
+    match question.id.0.parse::<i32>() {
+        Err(_) => {
+            Err(warp::reject::custom(InvalidId))
+        },
+        Ok(_) => {
+            Ok(warp::reply::json(&question))
+        }
+    }
+}
+
+pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
+    if let Some(_InvalidId) = r.find::<InvalidId>() {
+        Ok(warp::reply::with_status(
+            "No valid ID presented",
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ))
+    } else {
+        Ok(warp::reply::with_status(
+            "Route not found",
+            StatusCode::NOT_FOUND,
+        ))
+    }
 }
 
 #[tokio::main]
@@ -98,7 +123,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let get_items = warp::get()
         .and(warp::path("questions"))
         .and(warp::path::end())
-        .and_then(get_questions);
+        .and_then(get_questions)
+        .recover(return_error);
 
     let routes = get_items;
 
