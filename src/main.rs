@@ -79,7 +79,15 @@ impl FromStr for QuestionId {
     }
 }
 
-use warp::{Filter, reject::Reject, Rejection, Reply, http::StatusCode};
+use warp::{
+    Filter,
+    http::Method,
+    filters::{cors::CorsForbidden,},
+    reject::Reject,
+    Rejection,
+    Reply,
+    http::StatusCode
+};
 
 #[derive(Debug)]
 struct InvalidId;
@@ -105,7 +113,13 @@ pub async fn get_questions() -> Result<impl warp::Reply, warp::Rejection> {
 }
 
 pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
-    if let Some(_InvalidId) = r.find::<InvalidId>() {
+    println!("{:?}", r);
+    if let Some(error) = r.find::<CorsForbidden>() {
+        Ok(warp::reply::with_status(
+            "Cors Forbidden",
+            StatusCode::FORBIDDEN,
+        ))
+    } else if let Some(_InvalidId) = r.find::<InvalidId>() {
         Ok(warp::reply::with_status(
             "No valid ID presented",
             StatusCode::UNPROCESSABLE_ENTITY,
@@ -120,13 +134,20 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cors = warp::cors()
+        .allow_any_origin()
+        .allow_header("not-in-the-request")
+        .allow_methods(&[
+           Method::PUT, Method::DELETE, Method::GET, Method::POST
+        ]);
+
     let get_items = warp::get()
         .and(warp::path("questions"))
         .and(warp::path::end())
         .and_then(get_questions)
         .recover(return_error);
 
-    let routes = get_items;
+    let routes = get_items.with(cors);
 
     warp::serve(routes)
         .run(([127,0,0,1], 3030))
