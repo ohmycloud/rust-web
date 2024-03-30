@@ -1,6 +1,10 @@
 use serde::Serialize;
+use std::fmt;
+use std::fmt::Formatter;
+use std::io::ErrorKind;
+use std::collections::HashMap;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct Question {
     id: QuestionId,
     title: String,
@@ -8,8 +12,7 @@ struct Question {
     tags: Option<Vec<String>>,
 }
 
-
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Eq, PartialEq, Hash)]
 struct QuestionId(String); // New type pattern
 
 impl Question {
@@ -31,9 +34,33 @@ struct Position {
     latitude: f32,
 }
 
-use std::fmt;
-use std::fmt::Formatter;
-use std::io::ErrorKind;
+#[derive(Clone)]
+struct Store {
+    questions: HashMap<QuestionId, Question>,
+}
+
+impl Store {
+    fn new() -> Self {
+        Store {
+            questions: HashMap::new(),
+        }
+    }
+
+    fn add_question(mut self, question: Question) -> Self {
+        self.questions.insert(question.id.clone(), question);
+        self
+    }
+
+    fn init(self) -> Self {
+        let question = Question::new(
+            QuestionId::from_str("1").expect("Id not set"),
+            "How?".to_string(),
+            "Please help!".to_string(),
+            Some(vec!("general".to_string()))
+        );
+        self.add_question(question)
+    }
+}
 
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
