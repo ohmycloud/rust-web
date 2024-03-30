@@ -1,10 +1,7 @@
-use serde::Serialize;
-use std::fmt;
-use std::fmt::Formatter;
-use std::io::ErrorKind;
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct Question {
     id: QuestionId,
     title: String,
@@ -12,23 +9,10 @@ struct Question {
     tags: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Clone, Eq, PartialEq, Hash)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 struct QuestionId(String); // New type pattern
 
-impl Question {
-    fn new(id: QuestionId,
-           title: String,
-           content: String,
-           tags: Option<Vec<String>>) -> Self {
-        Self {
-            id,
-            title,
-            content,
-            tags
-        }
-    }
-}
-
+#[derive(Debug)]
 struct Position {
     longitude: f32,
     latitude: f32,
@@ -42,69 +26,16 @@ struct Store {
 impl Store {
     fn new() -> Self {
         Store {
-            questions: HashMap::new(),
+            questions: Self::init(),
         }
     }
 
-    fn add_question(mut self, question: Question) -> Self {
-        self.questions.insert(question.id.clone(), question);
-        self
-    }
-
-    fn init(self) -> Self {
-        let question = Question::new(
-            QuestionId::from_str("1").expect("Id not set"),
-            "How?".to_string(),
-            "Please help!".to_string(),
-            Some(vec!("general".to_string()))
-        );
-        self.add_question(question)
+    fn init() -> HashMap<QuestionId, Question> {
+        let file = include_str!("../questions/questions.json");
+        serde_json::from_str(file).expect("can't read questions.json")
     }
 }
 
-impl fmt::Display for Position {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", self.longitude, self.latitude)
-    }
-}
-
-impl fmt::Display for QuestionId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "idl: {}", self.0)
-    }
-}
-
-impl fmt::Display for Question {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}, title: {}, content: {}, tags: {:?}",
-            self.id, self.title, self.content, self.tags
-        )
-    }
-}
-
-impl fmt::Debug for Question {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self.tags)
-    }
-}
-
-use std::str::FromStr;
-use std::io::{Error};
-
-impl FromStr for QuestionId {
-    type Err = std::io::Error;
-
-    fn from_str(id: &str) -> Result<Self, Self::Err> {
-        match id.is_empty() {
-            false => Ok(QuestionId(id.to_string())),
-            true => Err(
-                Error::new(ErrorKind::InvalidInput, "No id provided")
-            )
-        }
-    }
-}
 
 use warp::{
     Filter,
@@ -116,40 +47,21 @@ use warp::{
     http::StatusCode
 };
 
-#[derive(Debug)]
-struct InvalidId;
-
-impl Reject for InvalidId {}
-
-pub async fn get_questions() -> Result<impl warp::Reply, warp::Rejection> {
-    let question = Question::new(
-        QuestionId::from_str("1").expect("No id provided"),
-        "First Question".to_string(),
-        "Content of question".to_string(),
-        Some(vec!("faq".to_string())),
-    );
-
-    match question.id.0.parse::<i32>() {
-        Err(_) => {
-            Err(warp::reject::custom(InvalidId))
-        },
-        Ok(_) => {
-            Ok(warp::reply::json(&question))
-        }
-    }
+pub async fn get_questions(
+    params: HashMap<String, String>,
+    store: Store
+) -> Result<impl warp::Reply, warp::Rejection> {
+    println!("{:?}", params);
+    let res: Vec<Question> = store.questions.values().cloned().collect();
+    Ok(warp::reply::json(&res))
 }
 
 pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
     println!("{:?}", r);
-    if let Some(error) = r.find::<CorsForbidden>() {
+    if let Some(_error) = r.find::<CorsForbidden>() {
         Ok(warp::reply::with_status(
             "Cors Forbidden",
             StatusCode::FORBIDDEN,
-        ))
-    } else if let Some(_InvalidId) = r.find::<InvalidId>() {
-        Ok(warp::reply::with_status(
-            "No valid ID presented",
-            StatusCode::UNPROCESSABLE_ENTITY,
         ))
     } else {
         Ok(warp::reply::with_status(
@@ -161,6 +73,9 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let store = Store::new();
+    let store_filter = warp::any().map(move || store.clone());
+
     let cors = warp::cors()
         .allow_any_origin()
         .allow_header("not-in-the-request")
@@ -171,6 +86,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let get_items = warp::get()
         .and(warp::path("questions"))
         .and(warp::path::end())
+        .and(warp::query())
+        .and(store_filter)
         .and_then(get_questions)
         .recover(return_error);
 
@@ -192,7 +109,7 @@ fn it_works() {
     );
     println!("{:?}", question);
 
-    assert_eq!("(1.987, 2.983)", format!("{}", Position {
+    assert_eq!("(1.987, 2.983)", format!("{:?}", Position {
         longitude: 1.987,
         latitude: 02.9830
     }));
