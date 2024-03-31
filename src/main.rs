@@ -1,220 +1,14 @@
-use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
-use std::fmt::Formatter;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use warp::{
-    Filter,
-    http::Method,
-    filters::{cors::CorsForbidden, body::BodyDeserializeError},
-    reject::Reject,
-    Rejection,
-    Reply,
-    http::StatusCode
-};
+mod error;
+mod store;
+mod types;
+mod routes;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct Question {
-    id: QuestionId,
-    title: String,
-    content: String,
-    tags: Option<Vec<String>>,
-}
+use error::return_error;
+use warp::{http::Method, Filter};
+use crate::routes::answer::add_answer;
+use crate::routes::question::{add_question, delete_question, get_questions, update_question};
+use crate::store::Store;
 
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
-struct QuestionId(String); // New type pattern
-
-#[derive(Debug)]
-struct Position {
-    longitude: f32,
-    latitude: f32,
-}
-
-#[derive(Clone)]
-struct Store {
-    questions: Arc<RwLock<HashMap<QuestionId, Question>>>,
-    answers: Arc<RwLock<HashMap<AnswerId, Answer>>>,
-}
-
-impl Store {
-    fn new() -> Self {
-        Store {
-            questions: Arc::new(RwLock::new(Self::init())),
-            answers: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
-    fn init() -> HashMap<QuestionId, Question> {
-        let file = include_str!("../questions/questions.json");
-        serde_json::from_str(file).expect("can't read questions.json")
-    }
-}
-
-pub async fn add_answer(
-    store: Store,
-    params: HashMap<String, String>,
-) -> Result<impl warp::reply::Reply, warp::Rejection> {
-    let answer = Answer {
-        id: AnswerId(uuid::Uuid::new_v4().to_string()),
-        content: params.get("content").unwrap().to_string(),
-        question_id: QuestionId(
-            params.get("questionId").unwrap().to_string()
-        ),
-    };
-    store.answers.write().await.insert(answer.id.clone(), answer);
-    Ok(warp::reply::with_status("Answer added", StatusCode::OK))
-}
-
-pub async fn delete_question(
-    id: String,
-    store: Store
-) -> Result<impl warp::Reply, warp::Rejection> {
-    match store.questions.write().await.remove(&QuestionId(id)) {
-        Some(_) => {
-            return Ok(
-                warp::reply::with_status(
-                    "Question deleted",
-                    StatusCode::OK,
-                )
-            )
-        },
-        None => return Err(warp::reject::custom(Error::QuestionNotFound)),
-    }
-}
-
-pub async fn update_question(
-    id: String,
-    store: Store,
-    question: Question,
-) -> Result<impl warp::Reply, warp::Rejection> {
-    match store.questions.write().await.get_mut(&QuestionId(id)) {
-        Some(q) => *q = question,
-        None => return Err(warp::reject::custom(Error::QuestionNotFound)),
-    }
-    Ok(
-        warp::reply::with_status(
-            "Question updated",
-            StatusCode::OK,
-        )
-    )
-}
-
-pub async fn add_question(
-    store: Store,
-    question: Question
-) -> Result<impl warp::Reply, warp::Rejection> {
-    store
-        .questions
-        .write()
-        .await
-        .insert(question.id.clone(), question);
-    Ok(warp::reply::with_status(
-        "Question added",
-        StatusCode::OK,
-    ))
-}
-
-pub async fn get_questions(
-    params: HashMap<String, String>,
-    store: Store
-) -> Result<impl warp::Reply, warp::Rejection> {
-    if !params.is_empty() {
-        let pagination = extract_pagination(params)?;
-        let res: Vec<Question> = store
-            .questions
-            .read()
-            .await
-            .values()
-            .cloned()
-            .collect();
-        let res = &res[pagination.start .. pagination.end];
-        Ok(warp::reply::json(&res))
-    } else {
-        let res: Vec<Question> = store
-            .questions
-            .read()
-            .await
-            .values()
-            .cloned()
-            .collect();
-        Ok(warp::reply::json(&res))
-    }
-}
-
-pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
-    println!("{:?}", r);
-    if let Some(error) = r.find::<Error>() {
-        Ok(warp::reply::with_status(
-            error.to_string(),
-            StatusCode::RANGE_NOT_SATISFIABLE,
-        ))
-    } else if let Some(error) = r.find::<CorsForbidden>() {
-        Ok(warp::reply::with_status(
-            error.to_string(),
-            StatusCode::FORBIDDEN,
-        ))
-    } else if let Some(error) = r.find::<BodyDeserializeError>() {
-        Ok(warp::reply::with_status(
-            error.to_string(),
-            StatusCode::UNPROCESSABLE_ENTITY,
-        ))
-    } else {
-        Ok(warp::reply::with_status(
-            "Route not found".to_string(),
-            StatusCode::NOT_FOUND,
-        ))
-    }
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq, Hash)]
-struct AnswerId(String);
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct Answer {
-    id: AnswerId,
-    content: String,
-    question_id: QuestionId
-}
-
-#[derive(Debug)]
-enum Error {
-    ParseError(std::num::ParseIntError),
-    MissingParameters,
-    QuestionNotFound,
-}
-
-#[derive(Debug)]
-struct Pagination {
-    start: usize,
-    end: usize,
-}
-
-pub fn extract_pagination(
-    params: HashMap<String, String>) -> Result<Pagination, Error> {
-    if params.contains_key("start") && params.contains_key("end") {
-        return Ok(
-            Pagination {
-                start: params.get("start").unwrap().parse::<usize>()
-                    .map_err(Error::ParseError)?,
-                end: params.get("end").unwrap().parse::<usize>()
-                    .map_err(Error::ParseError)?,
-            });
-    }
-    Err(Error::MissingParameters)
-}
-
-impl Reject for Error {}
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match *self {
-            Error::ParseError(ref err) => {
-                write!(f, "Cannot parse parameter: {}", err)
-            },
-            Error::MissingParameters => write!(f, "Missing parameter"),
-            Error::QuestionNotFound => write!(f, "Question not found"),
-        }
-    }
-}
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let store = Store::new();
@@ -223,9 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cors = warp::cors()
         .allow_any_origin()
         .allow_header("content-type")
-        .allow_methods(&[
-           Method::PUT, Method::DELETE, Method::GET, Method::POST
-        ]);
+        .allow_methods(&[Method::PUT, Method::DELETE, Method::GET, Method::POST]);
 
     let get_questions = warp::get()
         .and(warp::path("questions"))
@@ -271,24 +63,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(cors)
         .recover(return_error);
 
-    warp::serve(routes)
-        .run(([127,0,0,1], 3030))
-        .await;
+    warp::serve(routes).run(([127, 0, 0, 1], 3030)).await;
     Ok(())
-}
-
-#[test]
-fn it_works() {
-    let question = Question::new(
-        QuestionId::from_str("1").expect("No id provided"),
-        "第一个问题".into(),
-        "问题描述".into(),
-        Some(vec!["raku".into(), "Grammar".into()])
-    );
-    println!("{:?}", question);
-
-    assert_eq!("(1.987, 2.983)", format!("{:?}", Position {
-        longitude: 1.987,
-        latitude: 02.9830
-    }));
 }
