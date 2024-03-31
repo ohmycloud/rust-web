@@ -1,8 +1,17 @@
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
-use std::fmt::{Formatter, write};
+use std::fmt::Formatter;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use warp::{
+    Filter,
+    http::Method,
+    filters::{cors::CorsForbidden, body::BodyDeserializeError},
+    reject::Reject,
+    Rejection,
+    Reply,
+    http::StatusCode
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct Question {
@@ -38,17 +47,6 @@ impl Store {
         serde_json::from_str(file).expect("can't read questions.json")
     }
 }
-
-
-use warp::{
-    Filter,
-    http::Method,
-    filters::{cors::CorsForbidden,},
-    reject::Reject,
-    Rejection,
-    Reply,
-    http::StatusCode
-};
 
 pub async fn update_question(
     id: String,
@@ -120,6 +118,11 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
         Ok(warp::reply::with_status(
             error.to_string(),
             StatusCode::FORBIDDEN,
+        ))
+    } else if let Some(error) = r.find::<BodyDeserializeError>() {
+        Ok(warp::reply::with_status(
+            error.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
         ))
     } else {
         Ok(warp::reply::with_status(
