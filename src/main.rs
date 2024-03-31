@@ -1,9 +1,8 @@
-mod error;
 mod store;
 mod types;
 mod routes;
 
-use error::return_error;
+use handle_errors::return_error;
 use warp::{http::Method, Filter};
 use crate::routes::answer::add_answer;
 use crate::routes::question::{add_question, delete_question, get_questions, update_question};

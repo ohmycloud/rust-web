@@ -13,3 +13,4 @@ warp = "0.3.6"
 log = "0.4.20"
 serde_json = "1.0.115"
 uuid = { version = "1.8.0", features = ["v4"] }
+handle-errors = { version = "0.1.0", path = "handle-errors" }
