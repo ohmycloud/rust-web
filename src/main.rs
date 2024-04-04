@@ -11,6 +11,11 @@ use crate::store::Store;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
+    log::error!("This is an error!");
+    log::info!("This is an error!");
+    log::warn!("This is a warning");
+
     let store = Store::new();
     let store_filter = warp::any().map(move || store.clone());
 
