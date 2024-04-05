@@ -71,7 +71,7 @@ impl Store {
             Err(e) => {
                 tracing::event!(tracing::Level::ERROR, "{:?}", e);
                 Err(Error::DatabaseQueryError)
-            },
+            }
         }
     }
 
@@ -103,7 +103,7 @@ impl Store {
             Err(e) => {
                 tracing::event!(tracing::Level::ERROR, "{:?}", e);
                 Err(Error::DatabaseQueryError)
-            },
+            }
         }
     }
 
@@ -117,14 +117,11 @@ impl Store {
             Err(e) => {
                 tracing::event!(tracing::Level::ERROR, "{:?}", e);
                 Err(Error::DatabaseQueryError)
-            },
+            }
         }
     }
 
-    pub async fn add_answer(
-        &self,
-        answer: NewAnswer
-    ) -> Result<Answer, Error> {
+    pub async fn add_answer(&self, answer: NewAnswer) -> Result<Answer, Error> {
         match sqlx::query("INSERT INTO answers (content, question_id) VALUES ($1, $2)")
             .bind(answer.content)
             .bind(answer.question_id.0)

@@ -5,10 +5,7 @@ use std::collections::HashMap;
 use tracing::{event, instrument, Level};
 use warp::http::StatusCode;
 
-pub async fn delete_question(
-    id: i32,
-    store: Store
-) -> Result<impl warp::Reply, warp::Rejection> {
+pub async fn delete_question(id: i32, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
     match store.delete_question(id).await {
         Ok(_) => Ok(warp::reply::with_status(
             format!("Question {} deleted", id),
@@ -25,7 +22,7 @@ pub async fn update_question(
 ) -> Result<impl warp::Reply, warp::Rejection> {
     match store.update_question(question, id).await {
         Ok(res) => Ok(warp::reply::json(&res)),
-        Err(e) => Err(warp::reject::custom(e))
+        Err(e) => Err(warp::reject::custom(e)),
     }
 }
 
@@ -34,10 +31,7 @@ pub async fn add_question(
     question: NewQuestion,
 ) -> Result<impl warp::Reply, warp::Rejection> {
     match store.add_question(question).await {
-        Ok(_) => Ok(warp::reply::with_status(
-            "Question added",
-            StatusCode::OK)
-        ),
+        Ok(_) => Ok(warp::reply::with_status("Question added", StatusCode::OK)),
         Err(e) => Err(warp::reject::custom(e)),
     }
 }
@@ -55,8 +49,11 @@ pub async fn get_questions(
         pagination = extract_pagination(params)?;
     }
 
-    match store.get_questions(pagination.limit, pagination.offset).await {
-            Ok(res) => Ok(warp::reply::json(&res)),
-            Err(e) => return Err(warp::reject::custom(e)),
+    match store
+        .get_questions(pagination.limit, pagination.offset)
+        .await
+    {
+        Ok(res) => Ok(warp::reply::json(&res)),
+        Err(e) => return Err(warp::reject::custom(e)),
     }
 }
