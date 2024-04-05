@@ -13,10 +13,16 @@ use warp::{http::Method, Filter};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let log_filter = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| "practical_rust_book=info,warp=error".to_owned());
+        .unwrap_or_else(|_| "handle_errors=warn,practical_rust_book=info,warp=error".to_owned());
 
     let db_url = "postgres://postgres:password@localhost:5432/rustwebdev";
     let store = Store::new(db_url).await;
+
+    sqlx::migrate!()
+        .run(&store.clone().connection)
+        .await
+        .expect("Cannot run migration");
+
     let store_filter = warp::any().map(move || store.clone());
 
     tracing_subscriber::fmt()

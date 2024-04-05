@@ -1,7 +1,6 @@
 use crate::store::Store;
 use crate::types::pagination::{extract_pagination, Pagination};
-use crate::types::question::{NewQuestion, Question, QuestionId};
-use sqlx::postgres::PgRow;
+use crate::types::question::{NewQuestion, Question};
 use std::collections::HashMap;
 use tracing::{event, instrument, Level};
 use warp::http::StatusCode;
