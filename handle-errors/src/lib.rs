@@ -4,14 +4,14 @@ use warp::cors::CorsForbidden;
 use warp::http::StatusCode;
 use warp::reject::Reject;
 use warp::{Rejection, Reply};
-use sqlx::error::Error as SqlxError;
+use tracing::{event, Level, instrument};
 
 #[derive(Debug)]
 pub enum Error {
     ParseError(std::num::ParseIntError),
     MissingParameters,
     QuestionNotFound,
-    DatabaseQueryError(SqlxError),
+    DatabaseQueryError,
 }
 
 impl std::fmt::Display for Error {
@@ -22,8 +22,8 @@ impl std::fmt::Display for Error {
             }
             Error::MissingParameters => write!(f, "Missing parameter"),
             Error::QuestionNotFound => write!(f, "Question not found"),
-            Error::DatabaseQueryError(e) => {
-                write!(f, "Query could not be executed {}", e)
+            Error::DatabaseQueryError => {
+                write!(f, "Query could not be executed")
             },
         }
     }
@@ -31,12 +31,13 @@ impl std::fmt::Display for Error {
 
 impl Reject for Error {}
 
+#[instrument]
 pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
-    println!("{:?}", r);
-    if let Some(error) = r.find::<Error>() {
+    if let Some(crate::Error::DatabaseQueryError) = r.find() {
+        event!(Level::ERROR, "Database query error");
         Ok(warp::reply::with_status(
-            error.to_string(),
-            StatusCode::RANGE_NOT_SATISFIABLE,
+            crate::Error::DatabaseQueryError.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
         ))
     } else if let Some(error) = r.find::<CorsForbidden>() {
         Ok(warp::reply::with_status(
@@ -44,6 +45,12 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
             StatusCode::FORBIDDEN,
         ))
     } else if let Some(error) = r.find::<BodyDeserializeError>() {
+        Ok(warp::reply::with_status(
+            error.to_string(),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ))
+    } else if let Some(error) = r.find::<Error>() {
+        event!(Level::ERROR, "{}", error);
         Ok(warp::reply::with_status(
             error.to_string(),
             StatusCode::UNPROCESSABLE_ENTITY,

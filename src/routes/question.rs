@@ -1,22 +1,22 @@
 use crate::store::Store;
 use crate::types::pagination::{extract_pagination, Pagination};
 use crate::types::question::{NewQuestion, Question, QuestionId};
-use handle_errors::Error;
-use handle_errors::Error::DatabaseQueryError;
 use sqlx::postgres::PgRow;
-use sqlx::Row;
 use std::collections::HashMap;
-use tracing::{event, info, instrument, Level};
+use tracing::{event, instrument, Level};
 use warp::http::StatusCode;
 
-pub async fn delete_question(id: i32, store: Store) -> Result<impl warp::Reply, warp::Rejection> {
-    if let Err(e) = store.delete_question(id).await {
-        return Err(warp::reject::custom(Error::DatabaseQueryError(e)));
+pub async fn delete_question(
+    id: i32,
+    store: Store
+) -> Result<impl warp::Reply, warp::Rejection> {
+    match store.delete_question(id).await {
+        Ok(_) => Ok(warp::reply::with_status(
+            format!("Question {} deleted", id),
+            StatusCode::OK,
+        )),
+        Err(e) => Err(warp::reject::custom(e)),
     }
-    Ok(warp::reply::with_status(
-        format!("Question {} deleted", id),
-        StatusCode::OK,
-    ))
 }
 
 pub async fn update_question(
@@ -24,21 +24,23 @@ pub async fn update_question(
     store: Store,
     question: Question,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    let res = match store.update_question(question, id).await {
-        Ok(res) => res,
-        Err(e) => return Err(warp::reject::custom(Error::DatabaseQueryError(e))),
-    };
-    Ok(warp::reply::json(&res))
+    match store.update_question(question, id).await {
+        Ok(res) => Ok(warp::reply::json(&res)),
+        Err(e) => Err(warp::reject::custom(e))
+    }
 }
 
 pub async fn add_question(
     store: Store,
     question: NewQuestion,
 ) -> Result<impl warp::Reply, warp::Rejection> {
-    if let Err(e) = store.add_question(question).await {
-        return Err(warp::reject::custom(Error::DatabaseQueryError(e)));
+    match store.add_question(question).await {
+        Ok(_) => Ok(warp::reply::with_status(
+            "Question added",
+            StatusCode::OK)
+        ),
+        Err(e) => Err(warp::reject::custom(e)),
     }
-    Ok(warp::reply::with_status("Question added", StatusCode::OK))
 }
 
 #[instrument]
@@ -52,22 +54,10 @@ pub async fn get_questions(
     if !params.is_empty() {
         event!(Level::INFO, pagination = true);
         pagination = extract_pagination(params)?;
-        info!(pagination = false);
-        let res: Vec<Question> = match store
-            .get_questions(pagination.limit, pagination.offset)
-            .await
-        {
-            Ok(res) => res,
-            Err(e) => return Err(warp::reject::custom(e)),
-        };
+    }
 
-        Ok(warp::reply::json(&res))
-    } else {
-        info!(pagination = false);
-        let res: Vec<Question> = match store.get_questions(Some(0), 0).await {
-            Ok(res) => res,
+    match store.get_questions(pagination.limit, pagination.offset).await {
+            Ok(res) => Ok(warp::reply::json(&res)),
             Err(e) => return Err(warp::reject::custom(e)),
-        };
-        Ok(warp::reply::json(&res))
     }
 }

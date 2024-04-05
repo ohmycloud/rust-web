@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sqlx = "0.7.4"
+tracing = { version = "0.1.40", features = ["log"] }
 warp = "0.3.6"

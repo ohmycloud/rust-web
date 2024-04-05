@@ -3,7 +3,6 @@ use crate::types::question::{NewQuestion, Question, QuestionId};
 use handle_errors::Error;
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::Row;
-use tracing::event;
 
 #[derive(Debug, Clone)]
 pub struct Store {
@@ -45,12 +44,12 @@ impl Store {
             Ok(questions) => Ok(questions),
             Err(e) => {
                 tracing::event!(tracing::Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError(e))
+                Err(Error::DatabaseQueryError)
             }
         }
     }
 
-    pub async fn add_question(&self, question: NewQuestion) -> Result<Question, sqlx::Error> {
+    pub async fn add_question(&self, question: NewQuestion) -> Result<Question, Error> {
         match sqlx::query(
             "INSERT INTO questions (title, content, tags)
              VALUES ($1, $2, $3)
@@ -69,7 +68,10 @@ impl Store {
         .await
         {
             Ok(question) => Ok(question),
-            Err(e) => Err(e),
+            Err(e) => {
+                tracing::event!(tracing::Level::ERROR, "{:?}", e);
+                Err(Error::DatabaseQueryError)
+            },
         }
     }
 
@@ -77,7 +79,7 @@ impl Store {
         &self,
         question: Question,
         question_id: i32,
-    ) -> Result<Question, sqlx::Error> {
+    ) -> Result<Question, Error> {
         match sqlx::query(
             "UPDATE questions
                 SET title = $1, content = $2, tags = $3
@@ -98,22 +100,31 @@ impl Store {
         .await
         {
             Ok(question) => Ok(question),
-            Err(e) => Err(e),
+            Err(e) => {
+                tracing::event!(tracing::Level::ERROR, "{:?}", e);
+                Err(Error::DatabaseQueryError)
+            },
         }
     }
 
-    pub async fn delete_question(&self, question_id: i32) -> Result<bool, sqlx::Error> {
+    pub async fn delete_question(&self, question_id: i32) -> Result<bool, Error> {
         match sqlx::query("DELETE FROM questions WHERE id = $1")
             .bind(question_id)
             .execute(&self.connection)
             .await
         {
             Ok(_) => Ok(true),
-            Err(e) => Err(e),
+            Err(e) => {
+                tracing::event!(tracing::Level::ERROR, "{:?}", e);
+                Err(Error::DatabaseQueryError)
+            },
         }
     }
 
-    pub async fn add_answer(&self, answer: NewAnswer) -> Result<Answer, Error> {
+    pub async fn add_answer(
+        &self,
+        answer: NewAnswer
+    ) -> Result<Answer, Error> {
         match sqlx::query("INSERT INTO answers (content, question_id) VALUES ($1, $2)")
             .bind(answer.content)
             .bind(answer.question_id.0)
@@ -128,7 +139,7 @@ impl Store {
             Ok(answer) => Ok(answer),
             Err(e) => {
                 tracing::event!(tracing::Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError(e))
+                Err(Error::DatabaseQueryError)
             }
         }
     }
