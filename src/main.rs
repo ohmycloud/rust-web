@@ -1,23 +1,22 @@
 #![warn(clippy::all)]
+mod routes;
 mod store;
 mod types;
-mod routes;
 
-use handle_errors::return_error;
-use tracing_subscriber::fmt::format::FmtSpan;
-use warp::{http::Method, Filter};
 use crate::routes::answer::add_answer;
 use crate::routes::question::{add_question, delete_question, get_questions, update_question};
 use crate::store::Store;
+use handle_errors::return_error;
+use tracing_subscriber::fmt::format::FmtSpan;
+use warp::{http::Method, Filter};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let log_filter = std::env::var("RUST_LOG")
-        .unwrap_or_else(|_| {
-            "practical_rust_book=info,warp=error".to_owned()
-        });
+        .unwrap_or_else(|_| "practical_rust_book=info,warp=error".to_owned());
 
-    let store = Store::new();
+    let db_url = "postgres://postgres:password@localhost:5432/rustwebdev";
+    let store = Store::new(db_url).await;
     let store_filter = warp::any().map(move || store.clone());
 
     tracing_subscriber::fmt()
@@ -57,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let update_question = warp::put()
         .and(warp::path("questions"))
-        .and(warp::path::param::<String>())
+        .and(warp::path::param::<i32>())
         .and(warp::path::end())
         .and(store_filter.clone())
         .and(warp::body::json())
@@ -65,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let delete_question = warp::delete()
         .and(warp::path("questions"))
-        .and(warp::path::param::<String>())
+        .and(warp::path::param::<i32>())
         .and(warp::path::end())
         .and(store_filter.clone())
         .and_then(delete_question);
