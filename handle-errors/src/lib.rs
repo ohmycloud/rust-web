@@ -7,13 +7,31 @@ use warp::{Rejection, Reply};
 use tracing::{event, Level, instrument};
 use reqwest::Error as ReqwestError;
 
+#[derive(Debug, Clone)]
+pub struct APILayerError {
+    pub status: u16,
+    pub message: String,
+}
+
 #[derive(Debug)]
 pub enum Error {
     ParseError(std::num::ParseIntError),
     MissingParameters,
     QuestionNotFound,
     DatabaseQueryError,
-    ExternalAPIError(ReqwestError)
+    ExternalAPIError(ReqwestError),
+    // In case the HTTP client(Reqwest) returns an error
+    // We create a ClientError enum variant.
+    ClientError(APILayerError),
+    // In case the external API returns a 4xx or 5xx HTTP status code,
+    // we have a ServerError variant.
+    ServerError(APILayerError),
+}
+
+impl std::fmt::Display for APILayerError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Status: {}, Message: {}", self.status, self.message)
+    }
 }
 
 impl std::fmt::Display for Error {
@@ -30,11 +48,18 @@ impl std::fmt::Display for Error {
             Error::ExternalAPIError(err) => {
                 write!(f, "Cannot execute: {}", err)
             },
+            Error::ClientError(err) => {
+                write!(f, "External Client error: {}", err)
+            },
+            Error::ServerError(err) => {
+                write!(f, "External Server error: {}", err)
+            }
         }
     }
 }
 
 impl Reject for Error {}
+impl Reject for APILayerError {}
 
 #[instrument]
 pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
