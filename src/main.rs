@@ -2,6 +2,7 @@
 mod routes;
 mod store;
 mod types;
+mod profanity;
 
 use crate::routes::answer::add_answer;
 use crate::routes::question::{add_question, delete_question, get_questions, update_question};
