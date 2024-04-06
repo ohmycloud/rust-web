@@ -30,6 +30,20 @@ pub async fn add_question(
     store: Store,
     question: NewQuestion,
 ) -> Result<impl warp::Reply, warp::Rejection> {
+    let client = reqwest::Client::new();
+    let res = client
+        .post("https://api.apilayer.com/bad_words?censor_character=*")
+        .header("apikey", "XFjLHsAGUCuIRLj4NGgLtzOCjaEzyMro")
+        .body("a list with shit words")
+        .send()
+        .await
+        .map_err(|e| handle_errors::Error::ExternalAPIError(e))?
+        .text()
+        .await
+        .map_err(|e| handle_errors::Error::ExternalAPIError(e))?;
+
+    println!("{:?}", res);
+
     match store.add_question(question).await {
         Ok(_) => Ok(warp::reply::with_status("Question added", StatusCode::OK)),
         Err(e) => Err(warp::reject::custom(e)),

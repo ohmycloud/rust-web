@@ -28,3 +28,11 @@ curl --location --request POST 'localhost:3030/answers' \
      --data-urlencode 'id=raku' \
      --data-urlencode 'questionId=dev' \
      --data-urlencode 'content=This is the question I had.'
+
+# post question with bad words
+curl --location --request POST 'localhost:3030/questions' \
+      --header 'Content-Type: application/json' \
+      --data-raw '{
+      "title": "NEW ass  TITLE",
+      "content": "OLD CONTENT shit"
+}'

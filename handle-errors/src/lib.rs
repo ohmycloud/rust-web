@@ -5,6 +5,7 @@ use warp::http::StatusCode;
 use warp::reject::Reject;
 use warp::{Rejection, Reply};
 use tracing::{event, Level, instrument};
+use reqwest::Error as ReqwestError;
 
 #[derive(Debug)]
 pub enum Error {
@@ -12,6 +13,7 @@ pub enum Error {
     MissingParameters,
     QuestionNotFound,
     DatabaseQueryError,
+    ExternalAPIError(ReqwestError)
 }
 
 impl std::fmt::Display for Error {
@@ -24,6 +26,9 @@ impl std::fmt::Display for Error {
             Error::QuestionNotFound => write!(f, "Question not found"),
             Error::DatabaseQueryError => {
                 write!(f, "Query could not be executed")
+            },
+            Error::ExternalAPIError(err) => {
+                write!(f, "Cannot execute: {}", err)
             },
         }
     }
@@ -38,6 +43,12 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
         Ok(warp::reply::with_status(
             crate::Error::DatabaseQueryError.to_string(),
             StatusCode::UNPROCESSABLE_ENTITY,
+        ))
+    } else if let Some(crate::Error::ExternalAPIError(e)) = r.find() {
+        event!(Level::ERROR, "{}", e);
+        Ok(warp::reply::with_status(
+            "Internal Server Error".to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
         ))
     } else if let Some(error) = r.find::<CorsForbidden>() {
         Ok(warp::reply::with_status(
