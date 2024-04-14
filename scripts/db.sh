@@ -1,5 +1,6 @@
-psql -h localhost -p 5432 -u postgres
-
+psql -h localhost -p 5432 -U postgres
+create database rustwebdev;
+\c rustwebdev;
 # create
 sqlx migrate add -r question_table
 sqlx migrate run --database-url postgresql://postgres:password@localhost:5432/rustwebdev

@@ -6,6 +6,7 @@ use warp::reject::Reject;
 use warp::{Rejection, Reply};
 use tracing::{event, Level, instrument};
 use reqwest::Error as ReqwestError;
+use reqwest_middleware::Error as MiddlewareReqwestError;
 
 #[derive(Debug, Clone)]
 pub struct APILayerError {
@@ -26,6 +27,8 @@ pub enum Error {
     // In case the external API returns a 4xx or 5xx HTTP status code,
     // we have a ServerError variant.
     ServerError(APILayerError),
+    ReqwestAPIError(ReqwestError),
+    MiddlewareReqwestAPIError(MiddlewareReqwestError),
 }
 
 impl std::fmt::Display for APILayerError {
@@ -53,6 +56,12 @@ impl std::fmt::Display for Error {
             },
             Error::ServerError(err) => {
                 write!(f, "External Server error: {}", err)
+            },
+            Error::ReqwestAPIError(err) => {
+                write!(f, "External API error: {}", err)
+            },
+            Error::MiddlewareReqwestAPIError(err) => {
+                write!(f, "External API error: {}", err)
             }
         }
     }
@@ -90,6 +99,18 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
         Ok(warp::reply::with_status(
             error.to_string(),
             StatusCode::UNPROCESSABLE_ENTITY,
+        ))
+    } else if let Some(crate::Error::ReqwestAPIError(e)) = r.find() {
+        event!(Level::ERROR, "{}", e);
+        Ok(warp::reply::with_status(
+            "Internal Server Error".to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
+        ))
+    } else if let Some(crate::Error::MiddlewareReqwestAPIError(e)) = r.find() {
+        event!(Level::ERROR, "{}", e);
+        Ok(warp::reply::with_status(
+            "Internal Server Error".to_string(),
+            StatusCode::INTERNAL_SERVER_ERROR,
         ))
     } else {
         Ok(warp::reply::with_status(
