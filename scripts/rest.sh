@@ -36,3 +36,11 @@ curl --location --request POST 'localhost:3030/questions' \
       "title": "NEW ass  TITLE",
       "content": "OLD CONTENT shit"
 }'
+
+# add user and password
+curl --location --request POST 'localhost:3030/registration' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+        "email": "example@email.com",
+        "password": "cleartext"
+}'
