@@ -1,2 +1,1 @@
 # rust web development
-

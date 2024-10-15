@@ -44,3 +44,11 @@ curl --location --request POST 'localhost:3030/registration' \
         "email": "example@email.com",
         "password": "cleartext"
 }'
+
+# login
+curl --location --request POST 'localhost:3030/login' \
+    --header 'Content-Type: application/json' \
+    --data-raw '{
+    "email": "test@email.com",
+    "password": "cleartext"
+}'

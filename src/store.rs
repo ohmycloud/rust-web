@@ -1,6 +1,6 @@
 use crate::types::answer::{Answer, AnswerId, NewAnswer};
 use crate::types::question::{NewQuestion, Question, QuestionId};
-use crate::types::account::Account;
+use crate::types::account::{Account, AccountId};
 use handle_errors::Error;
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::Row;
@@ -170,6 +170,25 @@ impl Store {
                     .constraint()
                     .unwrap()
                 );
+                Err(Error::DatabaseQueryError(error))
+            }
+        }
+    }
+    
+    pub async fn get_account(self, email: String) -> Result<Account, Error> {
+        match sqlx::query("SELECT * from accounts where email = $1")
+            .bind(email)
+            .map(|row: PgRow| Account {
+                id: Some(AccountId(row.get("id"))),
+                email: row.get("email"),
+                password: row.get("password"),
+            })
+            .fetch_one(&self.connection)
+                .await
+        {
+            Ok(account) => Ok(account),
+            Err(error) => {
+                tracing::event!(tracing::Level::ERROR, "{:?}", error);
                 Err(Error::DatabaseQueryError(error))
             }
         }

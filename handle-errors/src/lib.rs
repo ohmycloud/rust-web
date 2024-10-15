@@ -5,6 +5,7 @@ use warp::http::StatusCode;
 use warp::reject::Reject;
 use warp::{Rejection, Reply};
 use tracing::{event, Level, instrument};
+use argon2::Error as ArgonError;
 use reqwest::Error as ReqwestError;
 use reqwest_middleware::Error as MiddlewareReqwestError;
 
@@ -18,6 +19,8 @@ pub struct APILayerError {
 pub enum Error {
     ParseError(std::num::ParseIntError),
     MissingParameters,
+    WrongPassword,
+    ArgonLibraryError(ArgonError),
     QuestionNotFound,
     DatabaseQueryError(sqlx::Error),
     ExternalAPIError(ReqwestError),
@@ -44,6 +47,8 @@ impl std::fmt::Display for Error {
                 write!(f, "Cannot parse parameter: {}", err)
             }
             Error::MissingParameters => write!(f, "Missing parameter"),
+            Error::WrongPassword => write!(f, "Wrong password"),
+            Error::ArgonLibraryError(_) => write!(f, "Cannot verifiy password"),
             Error::QuestionNotFound => write!(f, "Question not found"),
             Error::DatabaseQueryError(_) => {
                 write!(f, "Query could not be executed")
@@ -126,6 +131,12 @@ pub async fn return_error(r: Rejection) -> Result<impl Reply, Rejection> {
         Ok(warp::reply::with_status(
             "Internal Server Error".to_string(),
             StatusCode::INTERNAL_SERVER_ERROR,
+        ))
+    } else if let Some(crate::Error::WrongPassword) = r.find() {
+        event!(Level::ERROR, "Entered wrong password");
+        Ok(warp::reply::with_status(
+            "Wrong E-Mail/Password combination".to_string(),
+            StatusCode::UNAUTHORIZED,
         ))
     } else if let Some(crate::Error::MiddlewareReqwestAPIError(e)) = r.find() {
         event!(Level::ERROR, "{}", e);

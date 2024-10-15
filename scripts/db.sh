@@ -10,3 +10,6 @@ sqlx migrate run --database-url postgresql://postgres:password@localhost:5432/ru
 # revert
 sqlx migrate revert --database-url postgresql://postgres:password@localhost:5432/rustwebdev
 sqlx migrate revert --database-url postgresql://postgres:password@localhost:5432/rustwebdev
+
+# Cannot run migration: VersionMissing(20241015002023)
+drop table _sqlx_migrations;
