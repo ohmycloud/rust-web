@@ -18,7 +18,7 @@ impl Store {
             .await
         {
             Ok(pool) => pool,
-            Err(e) => panic!("Couldn't establish DB connection: {}", e),
+            Err(error) => panic!("Couldn't establish DB connection: {}", error),
         };
         Store {
             connection: db_pool,
@@ -43,9 +43,9 @@ impl Store {
             .await
         {
             Ok(questions) => Ok(questions),
-            Err(e) => {
-                tracing::event!(tracing::Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+            Err(error) => {
+                tracing::event!(tracing::Level::ERROR, "{:?}", error);
+                Err(Error::DatabaseQueryError(error))
             }
         }
     }
@@ -69,9 +69,9 @@ impl Store {
         .await
         {
             Ok(question) => Ok(question),
-            Err(e) => {
-                tracing::event!(tracing::Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+            Err(error) => {
+                tracing::event!(tracing::Level::ERROR, "{:?}", error);
+                Err(Error::DatabaseQueryError(error))
             }
         }
     }
@@ -101,9 +101,9 @@ impl Store {
         .await
         {
             Ok(question) => Ok(question),
-            Err(e) => {
-                tracing::event!(tracing::Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+            Err(error) => {
+                tracing::event!(tracing::Level::ERROR, "{:?}", error);
+                Err(Error::DatabaseQueryError(error))
             }
         }
     }
@@ -115,9 +115,9 @@ impl Store {
             .await
         {
             Ok(_) => Ok(true),
-            Err(e) => {
-                tracing::event!(tracing::Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+            Err(error) => {
+                tracing::event!(tracing::Level::ERROR, "{:?}", error);
+                Err(Error::DatabaseQueryError(error))
             }
         }
     }
@@ -135,9 +135,9 @@ impl Store {
             .await
         {
             Ok(answer) => Ok(answer),
-            Err(e) => {
-                tracing::event!(tracing::Level::ERROR, "{:?}", e);
-                Err(Error::DatabaseQueryError)
+            Err(error) => {
+                tracing::event!(tracing::Level::ERROR, "{:?}", error);
+                Err(Error::DatabaseQueryError(error))
             }
         }
     }
@@ -170,7 +170,7 @@ impl Store {
                     .constraint()
                     .unwrap()
                 );
-                Err(Error::DatabaseQueryError)
+                Err(Error::DatabaseQueryError(error))
             }
         }
     }
