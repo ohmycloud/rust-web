@@ -4,6 +4,7 @@ use crate::types::account::{Account, AccountId};
 use argon2::{self, Config};
 use paseto::v2::local_paseto;
 use rand::random;
+use chrono::prelude::*;
 
 // The hash function returns a string, the hashed version of the clear-text password
 pub fn hash_password(password: &[u8]) -> String {
@@ -46,13 +47,18 @@ fn verify_password(
 fn issue_token(
     account_id: AccountId
 ) -> String {
-    let state = serde_json::to_string(&account_id)
-        .expect("Failed to serialize state");
-    local_paseto(
-        &state,
-        None,
-        "RANDOM WORDS WINTER MACINTOSH PC".as_bytes()
-    ).expect("Failed to create token")
+    let current_datetime = Utc::now();
+    let dt = current_datetime + chrono::Duration::days(1);
+
+    paseto::tokens::PasetoBuilder::new()
+        .set_encryption_key(
+            &Vec::from("RANDOM WORDS WINTER MACINTOSH PC".as_bytes())
+        )
+        .set_expiration(&dt)
+        .set_not_before(&Utc::now())
+        .set_claim("account_id", serde_json::json!(account_id))
+        .build()
+        .expect("Failed to construct paseto token w/ builder!")
 }
 
 pub async fn login(
